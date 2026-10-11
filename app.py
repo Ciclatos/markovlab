@@ -2,6 +2,7 @@ import hashlib
 import textwrap
 import altair as alt
 import streamlit as st
+import os
 from groq import Groq
 
 from main import (
@@ -256,7 +257,10 @@ if archivo is not None:
             """
             with st.spinner("IA está analizando los resultados..."):
                 try:
-                    cliente = Groq(api_key=st.secrets["GROQ_API_KEY"])
+                    cliente = Groq(
+                        api_key=os.environ.get("GROQ_API_KEY")
+                        or st.secrets.get("GROQ_API_KEY")
+                    )
                     respuesta = cliente.chat.completions.create(
                         model="openai/gpt-oss-20b",
                         messages=[{"role": "user", "content": prompt}],
