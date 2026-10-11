@@ -1,0 +1,21 @@
+# Entornos virtuales
+.venv/
+.venv311/
+
+# Archivos temporales de Python
+__pycache__/
+*.pyc
+
+# Archivos auxiliares de macOS
+.DS_Store
+._*
+
+# Claves privadas
+.streamlit/secrets.toml
+
+# Configuración local
+.vscode/
+
+app_anterior.py
+probar_groq.py
+prueba.pdf
