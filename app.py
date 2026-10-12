@@ -1,8 +1,8 @@
 import hashlib
+import os
 import textwrap
 import altair as alt
 import streamlit as st
-import os
 from groq import Groq
 
 from main import (
@@ -55,8 +55,8 @@ if archivo is not None:
         st.write("Archivo:", archivo.name)
         st.subheader("Texto extraído")
         st.text_area("Contenido del documento", texto, height=250)
-        st.write("Caracteres extraídos:", len(texto))
-        st.write("Letras analizadas:", len(secuencia))
+        st.write("Caracteres extraídos:", f"{len(texto):,}")
+        st.write("Letras analizadas:", f"{len(secuencia):,}")
 
     # Comprobar que haya suficientes datos
     if len(secuencia) < 2:
@@ -76,18 +76,20 @@ if archivo is not None:
 
     with tab_estadistica:
         st.subheader("Análisis de transiciones")
-        st.write("Letras analizadas:", len(secuencia))
-        st.write("Total de transiciones:", sum(frecuencias.values()))
+        st.caption("Cada transición representa el paso entre dos letras consecutivas: V = vocal y C = consonante.")
+        st.write("Letras analizadas:", f"{len(secuencia):,}")
+        st.write("Total de transiciones:", f"{sum(frecuencias.values()):,}")
 
         # Mostrar las frecuencias
         col1, col2, col3, col4 = st.columns(4)
-        col1.metric("VV", frecuencias["VV"])
-        col2.metric("VC", frecuencias["VC"])
-        col3.metric("CV", frecuencias["CV"])
-        col4.metric("CC", frecuencias["CC"])
+        col1.metric("VV", f'{frecuencias["VV"]:,}')
+        col2.metric("VC", f'{frecuencias["VC"]:,}')
+        col3.metric("CV", f'{frecuencias["CV"]:,}')
+        col4.metric("CC", f'{frecuencias["CC"]:,}')
 
         # Gráfico de las transiciones
         st.subheader("Gráfico de transiciones")
+        st.caption("Compara cuántas veces aparece cada tipo de transición en el documento.")
         datos = [
             {"Transición": tipo, "Frecuencia": cantidad}
             for tipo, cantidad in frecuencias.items()
@@ -99,25 +101,31 @@ if archivo is not None:
                 "Frecuencia:Q",
                 title="Cantidad de transiciones",
                 scale=alt.Scale(domainMin=0),
+                axis=alt.Axis(format=",d"),
             ),
             y=alt.Y(
                 "Transición:N",
                 title=None,
                 sort=["VV", "VC", "CV", "CC"],
             ),
-            tooltip=["Transición:N", "Frecuencia:Q"],
+            tooltip=[
+                "Transición:N",
+                alt.Tooltip("Frecuencia:Q", format=",d"),
+            ],
         ).properties(height=220)
         st.altair_chart(grafico, use_container_width=True)
 
         # Frecuencias relativas
         total = sum(frecuencias.values())
         st.subheader("Frecuencias relativas")
+        st.caption("Indican qué porcentaje del total de transiciones corresponde a cada tipo (VV, VC, CV o CC).")
         for transicion, cantidad in frecuencias.items():
             porcentaje = cantidad / total * 100
             st.write(f"{transicion}: {porcentaje:.2f}%")
 
         # Matriz de transición
         st.subheader("Matriz de transición")
+        st.caption("Cada fila indica la probabilidad de pasar desde el estado actual (V o C) al siguiente estado en un paso.")
         st.dataframe(
             {
                 "Estado": ["V", "C"],
@@ -129,6 +137,7 @@ if archivo is not None:
 
         # Mapa de calor de la matriz
         st.subheader("Mapa de calor")
+        st.caption("Representa visualmente las probabilidades de la matriz: cada celda muestra la probabilidad de una transición.")
         datos_matriz = [
             {"Origen": "V", "Destino": "V", "Probabilidad": matriz[0][0]},
             {"Origen": "V", "Destino": "C", "Probabilidad": matriz[0][1]},
@@ -152,21 +161,22 @@ if archivo is not None:
             ],
         ).properties(height=250)
         etiquetas = alt.Chart(
-           alt.Data(values=datos_matriz)
-       ).mark_text(fontSize=18, fontWeight="bold").encode(
-           x=alt.X("Destino:N", sort=["V", "C"]),
-           y=alt.Y("Origen:N", sort=["V", "C"]),
-           text=alt.Text("Probabilidad:Q", format=".1%"),
-           color=alt.condition(
-               alt.datum.Probabilidad >= 0.5,
-               alt.value("#172033"),
-               alt.value("#FFFFFF"),
-           ),
-       )
+            alt.Data(values=datos_matriz)
+        ).mark_text(fontSize=18, fontWeight="bold").encode(
+            x=alt.X("Destino:N", sort=["V", "C"]),
+            y=alt.Y("Origen:N", sort=["V", "C"]),
+            text=alt.Text("Probabilidad:Q", format=".1%"),
+            color=alt.condition(
+                alt.datum.Probabilidad >= 0.5,
+                alt.value("#172033"),
+                alt.value("#FFFFFF"),
+            ),
+        )
         st.altair_chart(mapa_calor + etiquetas, use_container_width=True)
 
         # Verificar la matriz
         st.subheader("Verificación de la matriz")
+        st.caption("Comprueba que cada probabilidad esté entre 0 y 1 y que los valores de cada fila sumen 1.")
         filas_validas = True
         for i, fila in enumerate(matriz):
             suma = sum(fila)
@@ -186,7 +196,8 @@ if archivo is not None:
 
         # Probabilidades a n pasos
         st.subheader("Probabilidades a n pasos")
-        n = st.slider("Número de pasos", min_value=1, max_value=20, value=5)
+        st.caption("Calcula la probabilidad de llegar a V o C después de n transiciones, según el estado inicial.")
+        n = st.slider("Número de pasos", min_value=1, max_value=20, value=1)
         resultado = calcular_pasos(matriz, n)
         st.write(f"Matriz P^{n}")
         st.dataframe(
@@ -200,6 +211,7 @@ if archivo is not None:
 
         # Distribución estacionaria
         st.subheader("Distribución estacionaria")
+        st.caption("Describe la proporción de tiempo que ocuparía la cadena en cada estado cuando está en equilibrio; no es necesariamente el porcentaje exacto de letras del PDF.")
         col1, col2 = st.columns(2)
         col1.metric("Vocales (V)", f"{estacionaria[0] * 100:.2f}%")
         col2.metric("Consonantes (C)", f"{estacionaria[1] * 100:.2f}%")
@@ -218,11 +230,10 @@ if archivo is not None:
             ],
         ).properties(height=280)
         st.altair_chart(grafico_estacionaria, use_container_width=True)
-        # Explicar la distribución estacionaria
         st.info(
-        "La distribución estacionaria es una distribución de probabilidades "
-        "que permanece igual después de aplicar la matriz de transición. "
-        "No todas las cadenas convergen a ella desde cualquier estado inicial."
+            "La distribución estacionaria es una distribución de probabilidades "
+            "que permanece igual después de aplicar la matriz de transición. "
+            "No todas las cadenas convergen a ella desde cualquier estado inicial."
         )
 
     with tab_ia:
@@ -246,7 +257,6 @@ if archivo is not None:
 
             Utiliza lenguaje claro, preciso y en español.
             No inventes datos ni realices cálculos nuevos.
-            
             Presenta la respuesta con títulos y párrafos breves.
             Puedes utilizar listas cuando ayuden a explicar los resultados.
             No utilices LaTeX ni escribas fórmulas matemáticas.
@@ -275,3 +285,11 @@ if archivo is not None:
         # Mostrar la interpretación guardada
         if st.session_state.interpretacion is not None:
             st.markdown(st.session_state.interpretacion)
+
+# Créditos del proyecto
+st.markdown(textwrap.dedent("""
+<div style="margin-top: 44px; padding: 24px 12px; border-top: 1px solid #334155; text-align: center; color: #94A3B8; font-size: 13px; line-height: 1.9;">
+    <span style="font-weight: 600; color: #CBD5E1;">MarkovLab</span> · Proyecto académico de Estadística I<br>
+    Desarrollado por <span style="color: #E2E8F0;">Carlos Eduardo Díaz García</span> y <span style="color: #E2E8F0;">Jonathan Iván de la Cruz Jiménez</span>
+</div>
+"""), unsafe_allow_html=True)
